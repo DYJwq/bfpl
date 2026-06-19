@@ -1,26 +1,9 @@
-# 定义字符输出指针
-M tape;
-S p tape;
+M main;
+S p main;
+D cnt 5;
 
-# 在纸带上依次写入 Hello, World! 的 ASCII 码（以空格分隔）
-+ p 72; R p;   # H
-+ p 101; R p;  # e
-+ p 108; R p;  # l
-+ p 108; R p;  # l
-+ p 111; R p;  # o
-+ p 44; R p;   # ,
-+ p 32; R p;   # (space)
-+ p 87; R p;   # W
-+ p 111; R p;  # o
-+ p 114; R p;  # r
-+ p 108; R p;  # l
-+ p 100; R p;  # d
-+ p 33; R p;   # !
-
-# 将指针移回开头，逐个输出
-L p 13;
-[ p;
-    O p;
-    R p;
-];
-H;
+:loop;          # 开始倒计时
+    N cnt;
+    D cnt cnt - 1;
+JZ cnt loop;   # 若不为0则跳回
+H;              # 停机

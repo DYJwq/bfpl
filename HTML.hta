@@ -1,5 +1,49 @@
-#!/usr/bin/env python3
-# -*- coding: GBK -*-
+<h1>这是一个BFPL语言,基于Python3开发</h1>
+<p>作者github:DYJwd</p>
+<a href="https://github.com/DYJwd/BFPL">主页直达链接</a>
+<p>
+readme.md:
+本BFPL1.0语言通过Python3编写,接近汇编,有完备图灵.
+介绍:
+#: 注释
+D name expr : 定义名为name的变量,初始值为expr
+N name : 打印name的值
+M name : 定义图灵机名称为name
+S ptr_name TM : 设置ptr_name指向TM(TM为图灵机)
++ ptr expr : 使ptr指向的值加expr
+- ptr expr : 使ptr指向的值减expr
+R ptr expr : 使ptr指针右移expr位 R:right
+L ptr expr : 使ptr指针左移expr位 L:left
+O ptr : 输出ptr指向的值 O:output
+I v : 输入变量 v 的值(一个字符)
+J Label : 跳转到Label标签
+JZ v Label : 如果v为0则跳转到Label标签
+JNZ v Label : 如果v不为0则跳转到Label标签
+H : 停机
+E v expr : 使v等于expr
+[] : 如果v不为0则执行[]中的指令
+其他指令都无用,抛出SyntaxError:未知指令错误
+可能的报错:
+SyntaxError:未知指令错误
+SyntaxError:变量未定义错误
+SyntaxError:变量未初始化错误
+SyntaxError:图灵机未定义错误
+
+请先运行 ins Python.bat 脚本安装Python3环境
+
+接下来是实例:
+M tape;
+S p tape;
++ p 5;          # 纸带值设为 5
+[ p;            # 循环开始，条件 p 指向的值 != 0
+    O p;        # 输出当前值（字符形式）
+    - p 1;      # 值减 1
+];              # 循环结束
+H;</p>
+<p><del><small><h6>不建议下载</h6></small></del></p>
+<h6>出现任何问题不负责</h6>
+<p>Python源文件(源代码):</p>
+<p><strong># -*- coding: GBK -*-
 """
 BFPL (Brainfuck Pointer Language) 图灵机模拟器
 特性：
@@ -10,15 +54,13 @@ BFPL (Brainfuck Pointer Language) 图灵机模拟器
 - 标签与条件跳转 (J JZ JNZ)
 - 行注释 (#)
 - 调试模式 (-d)
-- 静默输出模式 (-q) 仅输出 O 指令的结果
 - [] 循环 (支持嵌套)
 """
 
 import re
 import sys
 from collections import defaultdict
-import argparse
-import random
+
 # ---------------------------- 安全表达式求值 ----------------------------
 class SafeEvaluator:
     """安全的算术表达式求值器（仅支持整数 + - * / % 和括号）"""
@@ -90,7 +132,7 @@ class Pointer:
 
 # ---------------------------- 模拟器核心 ----------------------------
 class TuringSimulator:
-    def __init__(self, debug=False, quiet=False):
+    def __init__(self, debug=False):
         self.variables = {}
         self.machines = {}
         self.pointers = {}
@@ -98,18 +140,14 @@ class TuringSimulator:
         self.statements = []
         self.ip = 0
         self.debug = debug
-        self.quiet = quiet          # 静默模式：只输出 O 指令的内容
         self.running = True
         self.bracket_pairs = {}
-        self.output_chars = []      # 统一收集 N 和 O 的输出字符/字符串
-        self.step_count = 0
-        self.max_steps = 1000000    # 防止死循环
+        self.output = ""   # 用于收集所有输出字符（新增）
 
     def execute(self, code):
-        # 去除注释
         code = re.sub(r'#.*$', '', code, flags=re.MULTILINE)
         raw_lines = [s.strip() for s in code.split(';') if s.strip()]
-
+        
         self.statements = []
         self.labels.clear()
         for line in raw_lines:
@@ -120,8 +158,7 @@ class TuringSimulator:
                 self.labels[label] = len(self.statements)
             else:
                 self.statements.append(line)
-
-        # 括号匹配
+        
         self.bracket_pairs = {}
         stack = []
         for idx, stmt in enumerate(self.statements):
@@ -139,20 +176,13 @@ class TuringSimulator:
                 self.bracket_pairs[idx] = left
         if stack:
             raise SyntaxError(f"未匹配的 '[' 在索引 {stack[0]}")
-
+        
         self.ip = 0
         self.running = True
-        self.step_count = 0
-
         while 0 <= self.ip < len(self.statements) and self.running:
-            self.step_count += 1
-            if self.step_count > self.max_steps:
-                raise RuntimeError(f"执行步数超过上限 {self.max_steps}，可能陷入死循环")
-
             stmt = self.statements[self.ip]
-            if self.debug and not self.quiet:
+            if self.debug:
                 print(f"[DEBUG] IP={self.ip}: {stmt}")
-
             jumped = self._exec_stmt(stmt)
             if not self.running:
                 break
@@ -182,11 +212,11 @@ class TuringSimulator:
                 if self.ip not in self.bracket_pairs:
                     raise RuntimeError("括号匹配错误")
                 self.ip = self.bracket_pairs[self.ip] + 1
-                if self.debug and not self.quiet:
+                if self.debug:
                     print(f"[ 条件为0，跳过循环体，跳转到 {self.ip}")
                 return True
             else:
-                if self.debug and not self.quiet:
+                if self.debug:
                     print(f"[ 条件非0，进入循环体")
                 return False
 
@@ -194,50 +224,50 @@ class TuringSimulator:
             if self.ip not in self.bracket_pairs:
                 raise RuntimeError("括号匹配错误")
             self.ip = self.bracket_pairs[self.ip]
-            if self.debug and not self.quiet:
-                print(f"] 跳转到 {self.ip}")
+            if self.debug:
+                print(f"] 跳转回 {self.ip}")
             return True
 
         # ---------- 其余指令（转为大写） ----------
         cmd_upper = cmd.upper()
 
-        # D name = expr   (定义变量)
+        # D name = expr
         if cmd_upper == 'D':
             if len(parts) < 3:
                 raise SyntaxError(f"D 需要两个参数: {stmt}")
             var_name = parts[1]
             value_expr = parts[2]
             self.variables[var_name] = self._get_value(value_expr)
-            if self.debug and not self.quiet:
+            if self.debug:
                 print(f"定义变量 {var_name} = {self.variables[var_name]}")
             return False
 
-        # N name   (打印变量值)   --- 修改：只输出数值，不打印描述，加入输出缓冲区
+        # N name (打印变量)
         elif cmd_upper == 'N':
             if len(parts) < 2:
                 raise SyntaxError(f"N 需要一个参数: {stmt}")
             name = parts[1]
-            value = self.variables.get(name, 0)
-            self.output_chars.append(str(value))   # 收集到纯净输出
-            # 不直接 print
-            if self.debug and not self.quiet:
-                print(f"N: {name} = {value}")
+            if name in self.variables:
+                msg = f"变量 {name} = {self.variables[name]}"
+                print(msg)
+                # 注意：不要在这里添加 output 收集，因为 N 是打印变量值，不是输出字符
+            else:
+                print(f"N: {name} (未定义变量)")
             return False
 
-        # M name   (创建图灵机)
+        # M name
         elif cmd_upper == 'M':
             if len(parts) < 2:
                 raise SyntaxError(f"M 需要一个参数: {stmt}")
             tur_name = parts[1]
             if tur_name in self.machines:
-                if self.debug and not self.quiet:
-                    print(f"警告: 图灵机 {tur_name} 已存在，将被覆盖")
+                print(f"警告: 图灵机 {tur_name} 已存在，将被覆盖")
             self.machines[tur_name] = TuringMachine(tur_name)
-            if self.debug and not self.quiet:
+            if self.debug:
                 print(f"创建图灵机: {tur_name}")
             return False
 
-        # S ptr_name machine_name   (定义指针)
+        # S ptr_name machine_name
         elif cmd_upper == 'S':
             if len(parts) < 3:
                 raise SyntaxError(f"S 需要两个参数: {stmt}")
@@ -246,7 +276,7 @@ class TuringSimulator:
             if tur_name not in self.machines:
                 raise ValueError(f"图灵机 {tur_name} 不存在")
             self.pointers[pos_name] = Pointer(pos_name, self.machines[tur_name], 0)
-            if self.debug and not self.quiet:
+            if self.debug:
                 print(f"定义指针 {pos_name} 指向 {tur_name}[0]")
             return False
 
@@ -261,7 +291,7 @@ class TuringSimulator:
             if len(parts) >= 3:
                 delta = self._get_value(parts[2])
             self.pointers[pos_name].inc(delta)
-            if self.debug and not self.quiet:
+            if self.debug:
                 print(f"{pos_name} +{delta} -> {self.pointers[pos_name]}")
             return False
 
@@ -276,7 +306,7 @@ class TuringSimulator:
             if len(parts) >= 3:
                 delta = self._get_value(parts[2])
             self.pointers[pos_name].dec(delta)
-            if self.debug and not self.quiet:
+            if self.debug:
                 print(f"{pos_name} -{delta} -> {self.pointers[pos_name]}")
             return False
 
@@ -291,7 +321,7 @@ class TuringSimulator:
             if len(parts) >= 3:
                 steps = self._get_value(parts[2])
             self.pointers[pos_name].right(steps)
-            if self.debug and not self.quiet:
+            if self.debug:
                 print(f"{pos_name} 右移 {steps} -> {self.pointers[pos_name]}")
             return False
 
@@ -306,11 +336,11 @@ class TuringSimulator:
             if len(parts) >= 3:
                 steps = self._get_value(parts[2])
             self.pointers[pos_name].left(steps)
-            if self.debug and not self.quiet:
+            if self.debug:
                 print(f"{pos_name} 左移 {steps} -> {self.pointers[pos_name]}")
             return False
 
-        # O ptr   (输出字符)   --- 修改：仅收集，不立即打印
+        # O ptr (输出字符)
         elif cmd_upper == 'O':
             if len(parts) < 2:
                 raise SyntaxError(f"O 需要一个指针名: {stmt}")
@@ -318,13 +348,13 @@ class TuringSimulator:
             if pos_name not in self.pointers:
                 raise ValueError(f"指针 {pos_name} 不存在")
             ch = self.pointers[pos_name].read_char()
-            self.output_chars.append(ch)   # 收集到纯净输出
-            # 不直接 print
-            if self.debug and not self.quiet:
+            print(ch, end='')
+            self.output += ch   # 收集输出（新增）
+            if self.debug:
                 print(f"输出: '{ch}' (ASCII {ord(ch)})")
             return False
 
-        # I ptr   (输入字符)
+        # I ptr
         elif cmd_upper == 'I':
             if len(parts) < 2:
                 raise SyntaxError(f"I 需要一个指针名: {stmt}")
@@ -340,11 +370,11 @@ class TuringSimulator:
             else:
                 ch = '\x00'
             self.pointers[pos_name].write_char(ch)
-            if self.debug and not self.quiet:
+            if self.debug:
                 print(f"输入 '{ch}' 写入 {pos_name}")
             return False
 
-        # J label   (无条件跳转)
+        # J label
         elif cmd_upper == 'J':
             if len(parts) < 2:
                 raise SyntaxError(f"J 需要一个标签: {stmt}")
@@ -352,11 +382,11 @@ class TuringSimulator:
             if label not in self.labels:
                 raise ValueError(f"标签 {label} 不存在")
             self.ip = self.labels[label]
-            if self.debug and not self.quiet:
+            if self.debug:
                 print(f"跳转到 {label} (IP={self.ip})")
             return True
 
-        # JZ var label   (变量为0跳转)
+        # JZ var label
         elif cmd_upper == 'JZ':
             if len(parts) < 3:
                 raise SyntaxError(f"JZ 需要两个参数: 变量 标签")
@@ -367,15 +397,15 @@ class TuringSimulator:
             val = self.variables.get(var_name, 0)
             if val == 0:
                 self.ip = self.labels[label]
-                if self.debug and not self.quiet:
+                if self.debug:
                     print(f"{var_name} == 0 -> 跳转到 {label}")
                 return True
             else:
-                if self.debug and not self.quiet:
+                if self.debug:
                     print(f"{var_name} = {val} != 0, 不跳转")
                 return False
 
-        # JNZ var label   (变量非0跳转)
+        # JNZ var label
         elif cmd_upper == 'JNZ':
             if len(parts) < 3:
                 raise SyntaxError(f"JNZ 需要两个参数: 变量 标签")
@@ -386,29 +416,29 @@ class TuringSimulator:
             val = self.variables.get(var_name, 0)
             if val != 0:
                 self.ip = self.labels[label]
-                if self.debug and not self.quiet:
+                if self.debug:
                     print(f"{var_name} != 0 -> 跳转到 {label}")
                 return True
             else:
-                if self.debug and not self.quiet:
+                if self.debug:
                     print(f"{var_name} = 0, 不跳转")
                 return False
 
-        # H   (停机)
+        # H
         elif cmd_upper == 'H':
             self.running = False
-            if self.debug and not self.quiet:
+            if self.debug:
                 print("停机")
             return False
 
-        # E var = expr   (赋值，与 D 相同)
+        # E var = expr
         elif cmd_upper == 'E':
             if len(parts) < 3:
                 raise SyntaxError(f"E 需要两个参数: {stmt}")
             var_name = parts[1]
             value_expr = parts[2]
             self.variables[var_name] = self._get_value(value_expr)
-            if self.debug and not self.quiet:
+            if self.debug:
                 print(f"赋值 {var_name} = {self.variables[var_name]}")
             return False
 
@@ -417,48 +447,48 @@ class TuringSimulator:
 
 # ---------------------------- 主程序入口 ----------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="BFPL 图灵机模拟器",
-        epilog="示例: python bfpl.py demo.bfpl -d"
-    )
-    parser.add_argument('filename', help='源文件 (.bfpl)')
-    parser.add_argument('-d', '--debug', action='store_true', help='开启调试模式')
-    parser.add_argument('-q', '--quiet', action='store_true',
-                        help='静默模式：只输出 N 和 O 指令的结果，不显示调试信息和最终状态')
-    args = parser.parse_args()
+    debug = '-d' in sys.argv
+    filename = None
+    for arg in sys.argv[1:]:
+        if arg != '-d':
+            filename = arg
+            break
 
-    # 读取文件（优先 UTF-8，失败则尝试 GBK）
+    if not filename:
+        print("用法: python bfpl.py <源文件.bfpl> [-d]")
+        print("示例: python bfpl.py demo.bfpl -d")
+        sys.exit(1)
+
     try:
-        with open(args.filename, 'r', encoding='utf-8') as f:
+        with open(filename, 'r', encoding='utf-8') as f:
             program = f.read()
+    except FileNotFoundError:
+        print(f"错误: 文件不存在 '{filename}'")
+        sys.exit(1)
     except UnicodeDecodeError:
+        # 如果 UTF-8 失败，尝试 GBK
         try:
-            with open(args.filename, 'r', encoding='gbk') as f:
+            with open(filename, 'r', encoding='gbk') as f:
                 program = f.read()
         except Exception as e:
             print(f"无法读取文件，编码错误: {e}")
             sys.exit(1)
-    except FileNotFoundError:
-        print(f"错误: 文件不存在 '{args.filename}'")
-        sys.exit(1)
 
-    sim = TuringSimulator(debug=args.debug, quiet=args.quiet)
+    sim = TuringSimulator(debug=debug)
     try:
         sim.execute(program)
     except Exception as e:
         print(f"\n运行时错误: {e}")
         sys.exit(1)
 
-    # 非静默模式打印最终状态
-    if not args.quiet:
-        print("\n=== 最终状态 ===")
-        for m in sim.machines.values():
-            print(m)
-        for p in sim.pointers.values():
-            print(p)
+    print("\n=== 最终状态 ===")
+    for m in sim.machines.values():
+        print(m)
+    for p in sim.pointers.values():
+        print(p)
 
-    # 打印纯净输出（所有 N 和 O 输出的内容）
-    if sim.output_chars:
-        if not args.quiet:
-            print("\n=== 纯净输出 ===")
-        print(''.join(sim.output_chars))
+    # 新增：打印纯净输出（所有 O 指令输出的字符）
+    if sim.output:
+        print("\n=== 纯净输出 ===")
+        print(sim.output)</strong></p>
+<p><del>这都是源文件,建议评论仓库,我尽力维护</del></p>
